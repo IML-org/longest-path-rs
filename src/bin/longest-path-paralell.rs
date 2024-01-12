@@ -24,7 +24,6 @@ fn main() {
             return;
         }
     };
-    println!("Graph: {:?}", graph);
     let root_label = match std::env::args().nth(1) {
         Some(s) => s,
         None => {

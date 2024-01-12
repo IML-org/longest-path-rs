@@ -81,6 +81,7 @@ impl Graph {
 
     pub fn from_json_undirected(json: &str) -> Result<Graph, serde_json::Error> {
         let data: Vec<EdgeData> = serde_json::from_str(json)?;
+        let edge_count = data.len();
         let mut nodes: Vec<Node> = Vec::new();
         let mut node_count: u32 = 0;
         for edge in data {
@@ -125,6 +126,7 @@ impl Graph {
                 cost: edge.2,
             });
         }
+        eprintln!("Graph imported: {} nodes, {} edges", node_count, edge_count);
         Ok(Graph {
             node_count,
             nodes,
