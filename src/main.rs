@@ -141,6 +141,11 @@ impl Graph {
         let mut finder = LongestPathFinder::new(self);
         finder.get_longest_path(root)
     }
+
+    fn find_longest_path_to(&self, root: u32, to_node_id: u32) -> Path {
+        let mut finder = LongestPathFinder::new(self);
+        finder.get_longest_path_to(root, to_node_id)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -196,6 +201,33 @@ impl LongestPathFinder<'_> {
         self.visited_nodes.remove(&node_id);
     }
 
+    fn calc_longest_path_to(&mut self, node_id: u32, to_node_id: u32, path: Path) {
+        if self.visited_nodes.contains(&node_id) {
+            return;
+        }
+
+        let mut path = path;
+        path.node_ids.push(node_id);
+
+        if node_id == to_node_id {
+            if self.longest_paths[node_id as usize].distance_sum < path.distance_sum {
+                self.longest_paths[node_id as usize] = path.clone();
+            }
+            return;
+        }
+
+        self.visited_nodes.insert(node_id);
+        let node = &self.graph.nodes[node_id as usize];
+        for edge in &node.edges {
+            let path = Path {
+                node_ids: path.node_ids.clone(),
+                distance_sum: path.distance_sum + edge.cost,
+            };
+            self.calc_longest_path_to(edge.to, to_node_id, path);
+        }
+        self.visited_nodes.remove(&node_id);
+    }
+
     fn get_longest_path(&mut self, root: u32) -> Path {
         self.calc_longest_path(root, Path::default());
         let mut longest_path = Path::default();
@@ -205,6 +237,11 @@ impl LongestPathFinder<'_> {
             }
         }
         longest_path
+    }
+
+    fn get_longest_path_to(&mut self, root: u32, to_node_id: u32) -> Path {
+        self.calc_longest_path_to(root, to_node_id, Path::default());
+        self.longest_paths[to_node_id as usize].clone()
     }
 }
 
@@ -244,6 +281,28 @@ fn main() {
         }
     };
     println!("Root: {}", root_label);
+
+    let target: Option<u32> = match std::env::args().nth(2) {
+        Some(s) => match graph.find_node_id(&s) {
+            Some(id) => Some(id),
+            None => {
+                eprintln!("Node not found: {}", s);
+                return;
+            }
+        },
+        None => None,
+    };
+
+    if let Some(target) = target {
+        println!("Longest path to {}:", graph.nodes[target as usize].label);
+        let longest_path = graph.find_longest_path_to(root, target);
+        for node_id in &longest_path.node_ids {
+            let node = &graph.nodes[*node_id as usize];
+            println!("{}", node.label);
+        }
+        println!("Distance sum: {}", longest_path.distance_sum);
+        return;
+    }
     println!("Longest path:");
     let longest_path = graph.find_longest_path(root);
     for node_id in &longest_path.node_ids {
