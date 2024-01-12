@@ -137,6 +137,15 @@ impl Graph {
         None
     }
 
+    fn find_neighbor_id_set(&self, node_id: u32) -> HashSet<u32> {
+        let mut neighbor_id_set = HashSet::new();
+        let node = &self.nodes[node_id as usize];
+        for edge in &node.edges {
+            neighbor_id_set.insert(edge.to);
+        }
+        neighbor_id_set
+    }
+
     fn find_longest_path(&self, root: u32) -> Path {
         let mut finder = LongestPathFinder::new(self);
         finder.get_longest_path(root)
@@ -151,6 +160,7 @@ impl Graph {
 #[derive(Debug, Clone)]
 struct Path {
     node_ids: Vec<u32>,
+    node_id_set: HashSet<u32>,
     distance_sum: u64,
 }
 
@@ -158,6 +168,7 @@ impl Default for Path {
     fn default() -> Path {
         Path {
             node_ids: Vec::new(),
+            node_id_set: HashSet::new(),
             distance_sum: 0,
         }
     }
@@ -185,6 +196,7 @@ impl LongestPathFinder<'_> {
         }
         let mut path = path;
         path.node_ids.push(node_id);
+        path.node_id_set.insert(node_id);
         self.visited_nodes.insert(node_id);
         if self.longest_paths[node_id as usize].distance_sum < path.distance_sum {
             self.longest_paths[node_id as usize] = path.clone();
@@ -194,6 +206,7 @@ impl LongestPathFinder<'_> {
         for edge in &node.edges {
             let path = Path {
                 node_ids: path.node_ids.clone(),
+                node_id_set: path.node_id_set.clone(),
                 distance_sum: path.distance_sum + edge.cost,
             };
             self.calc_longest_path(edge.to, path);
@@ -201,13 +214,16 @@ impl LongestPathFinder<'_> {
         self.visited_nodes.remove(&node_id);
     }
 
-    fn calc_longest_path_to(&mut self, node_id: u32, to_node_id: u32, path: Path) {
+    fn calc_longest_path_to(&mut self, node_id: u32, to_node_id: u32, path: Path, target_neighbor_id_set: &HashSet<u32>) {
         if self.visited_nodes.contains(&node_id) {
             return;
         }
 
         let mut path = path;
         path.node_ids.push(node_id);
+        path.node_id_set.insert(node_id);
+
+        let finished = path.node_id_set.is_superset(target_neighbor_id_set);
 
         if node_id == to_node_id {
             if self.longest_paths[node_id as usize].distance_sum < path.distance_sum {
@@ -219,11 +235,15 @@ impl LongestPathFinder<'_> {
         self.visited_nodes.insert(node_id);
         let node = &self.graph.nodes[node_id as usize];
         for edge in &node.edges {
+            if finished && edge.to != to_node_id {
+                continue;
+            }
             let path = Path {
                 node_ids: path.node_ids.clone(),
+                node_id_set: path.node_id_set.clone(),
                 distance_sum: path.distance_sum + edge.cost,
             };
-            self.calc_longest_path_to(edge.to, to_node_id, path);
+            self.calc_longest_path_to(edge.to, to_node_id, path, target_neighbor_id_set);
         }
         self.visited_nodes.remove(&node_id);
     }
@@ -240,7 +260,8 @@ impl LongestPathFinder<'_> {
     }
 
     fn get_longest_path_to(&mut self, root: u32, to_node_id: u32) -> Path {
-        self.calc_longest_path_to(root, to_node_id, Path::default());
+        let target_neighbor_id_set = self.graph.find_neighbor_id_set(to_node_id);
+        self.calc_longest_path_to(root, to_node_id, Path::default(), &target_neighbor_id_set);
         self.longest_paths[to_node_id as usize].clone()
     }
 }
@@ -269,7 +290,7 @@ fn main() {
     let root_label = match std::env::args().nth(1) {
         Some(s) => s,
         None => {
-            eprintln!("Usage: {} <root node label>", std::env::args().nth(0).unwrap());
+            eprintln!("Usage: {} <root node label> [<target node label>]", std::env::args().nth(0).unwrap());
             return;
         }
     };
